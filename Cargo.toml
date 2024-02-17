@@ -1,0 +1,18 @@
+[package]
+name = "smarinth"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+argon2 = "0.5"
+axum = "0.7"
+axum-extra = { version = "0.9.2", features = ["typed-header"] }
+config = "0.14"
+jsonwebtoken = "9.2"
+serde = "1.0"
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "mysql"] }
+thiserror = "1"
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

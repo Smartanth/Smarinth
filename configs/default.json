@@ -1,0 +1,21 @@
+{
+  "environment": "development",
+
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8080
+  },
+
+  "database": {
+    "uri": "mysql://root:root@localhost:3306/smartanth"
+  },
+
+  "auth": {
+    "secret": "smartanth-secret",
+    "expiration": 233333
+  },
+
+  "logger": {
+    "level": "debug"
+  }
+}
