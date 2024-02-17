@@ -1,0 +1,13 @@
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[logger]
+level = "debug"
+
+[database]
+uri = "sqlite::memory:"
+
+[auth]
+secret = "smartanth-secret"
+expiration = 233333
