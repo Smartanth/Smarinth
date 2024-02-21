@@ -66,7 +66,11 @@ impl Database {
         sqlx::any::install_default_drivers();
 
         let pool = match AnyPoolOptions::new().connect_with(db_options).await {
-            Ok(pool) => pool,
+            Ok(pool) => {
+                Self::create_tables(&db_scheme, &pool).await?;
+
+                pool
+            },
             Err(Error::Database(_)) => {
                 let pool = Self::create_database(db_url).await?;
                 Self::create_tables(&db_scheme, &pool).await?;

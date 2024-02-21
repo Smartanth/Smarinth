@@ -10,12 +10,10 @@ use crate::configs::database::Database;
 use crate::configs::password::{Argon2Hash, Password};
 use crate::configs::settings::Settings;
 use crate::handlers::auth_handler;
+use crate::middlewares::auth_middleware::JWTAuth;
 use crate::repository::user_repository::UserRepository;
-use crate::services::auth_service::AuthService;
-use crate::services::token_service::TokenService;
-use crate::services::user_service::UserService;
-use crate::states::auth_state::AuthState;
-use crate::states::user_state::UserState;
+use crate::services::{auth_service, token_service, user_service};
+use crate::states::{auth_state, user_state};
 
 mod configs;
 mod entities;
@@ -52,26 +50,30 @@ async fn main() -> io::Result<()> {
     web::HttpServer::new(move || {
         let user_repo = Arc::new(UserRepository::new(&hasher, &database));
 
-        let auth_service = Arc::new(AuthService::new(&hasher));
-        let token_service = Arc::new(TokenService::new(&settings));
-        let user_service = Arc::new(UserService::new(&user_repo));
+        let auth_service = Arc::new(auth_service::AuthService::new(&hasher));
+        let token_service = Arc::new(token_service::TokenService::new(&settings));
+        let user_service = Arc::new(user_service::UserService::new(&user_repo));
 
-        let auth_state = AuthState {
+        let auth_state = auth_state::AuthState {
             auth_service: auth_service.clone(),
             token_service: token_service.clone(),
             user_service: user_service.clone(),
         };
-        let user_state = UserState {
+        let user_state = user_state::UserState {
             user_service: user_service.clone(),
         };
 
         App::new()
-            .state(auth_state)
-            .state(user_state)
+            .state(auth_state.clone())
+            .state(user_state.clone())
             .service(
                 scope("/auth")
                     .service(auth_handler::auth)
                     .service(auth_handler::register)
+            )
+            .service(
+                scope("api")
+                    .wrap(JWTAuth::new(&Arc::new(auth_state)))
             )
     })
         .bind(address)?

@@ -1,11 +1,9 @@
-use ntex::web::{Error, HttpResponse, post, Responder};
-use ntex::web::types::{Json, State};
+use ntex::web::{Error, HttpResponse, post, Responder, types};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::user_error::UserError;
-use crate::payload::user_dto::{UserCreateDto, UserDto, UserIdentity, UserQueryDto};
-use crate::states::auth_state::AuthState;
-use crate::states::user_state::UserState;
+use crate::payload::user_dto::{UserCreateDto, UserDto, UserIdentity};
+use crate::states::{auth_state, user_state};
 
 #[derive(Clone, Serialize, Deserialize)]
 struct LoginPayload {
@@ -16,22 +14,19 @@ struct LoginPayload {
 
 #[post("/login")]
 pub async fn auth(
-    payload: Json<LoginPayload>,
-    auth_state: State<AuthState>,
+    payload: types::Json<LoginPayload>,
+    auth_state: types::State<auth_state::AuthState>,
 ) -> Result<impl Responder, Error> {
-    let Json(LoginPayload { username, email, password }) = payload;
-    let query_data = UserQueryDto {
-        identity: match username {
-            Some(username) => UserIdentity::Username(username),
-            None => match email {
-                Some(email) => UserIdentity::Email(email),
-                None => Err(UserError::MissingIdentity)?,
-            },
+    let types::Json(LoginPayload { username, email, password }) = payload;
+    let identity = match username {
+        Some(username) => UserIdentity::Username(username),
+        None => match email {
+            Some(email) => UserIdentity::Email(email),
+            None => Err(UserError::MissingIdentity)?,
         },
-        password: password.clone(),
     };
 
-    let user = auth_state.user_service.find_user(query_data).await?;
+    let user = auth_state.user_service.find_user(identity).await?;
 
     match auth_state.auth_service.verify_password(&user, &password) {
         true => {
@@ -52,10 +47,10 @@ struct RegisterPayload {
 
 #[post("/register")]
 pub async fn register(
-    payload: Json<RegisterPayload>,
-    user_state: State<UserState>,
+    payload: types::Json<RegisterPayload>,
+    user_state: types::State<user_state::UserState>,
 ) -> Result<impl Responder, Error> {
-    let Json(RegisterPayload { username, email, password }) = payload;
+    let types::Json(RegisterPayload { username, email, password }) = payload;
     let create_data = UserCreateDto { username, email, password };
 
     let user = user_state.user_service.create_user(create_data).await?;

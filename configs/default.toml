@@ -6,7 +6,7 @@ port = 8080
 level = "debug"
 
 [database]
-uri = "sqlite::memory:"
+url = "sqlite::memory:"
 
 [auth]
 secret = "smartanth-secret"

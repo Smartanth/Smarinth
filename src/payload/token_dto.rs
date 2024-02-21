@@ -10,6 +10,7 @@ pub struct TokenDto {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenClaimsDto {
     pub sub: String,
+    pub username: String,
     pub email: String,
     pub iat: u64,
     pub exp: u64,

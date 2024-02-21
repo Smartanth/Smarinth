@@ -32,7 +32,7 @@ impl TokenService {
             Ok(claims) => Ok(claims),
             Err(err) => match err.kind() {
                 ErrorKind::ExpiredSignature => Err(TokenError::TokenExpired)?,
-                _ => Err(TokenError::InvalidToken(token.to_string()))?
+                _ => Err(TokenError::InvalidToken(token.to_string()))?,
             }
         }
     }
@@ -46,6 +46,7 @@ impl TokenService {
 
         let claims = TokenClaimsDto {
             sub: user.id.to_string(),
+            username: user.username,
             email: user.email,
             iat,
             exp,

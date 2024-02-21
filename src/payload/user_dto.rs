@@ -6,6 +6,7 @@ use crate::entities::user::User;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum UserIdentity {
+    Id(i32),
     Username(String),
     Email(String),
 }
@@ -33,7 +34,7 @@ pub struct UserDto {
 impl From<User> for UserQueryDto {
     fn from(model: User) -> UserQueryDto {
         Self {
-            identity: UserIdentity::Email(model.email),
+            identity: UserIdentity::Id(model.id),
             password: model.password,
         }
     }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::entities::user::User;
 use crate::errors::api_error::ApiError;
 use crate::errors::user_error::UserError;
-use crate::payload::user_dto::{UserCreateDto, UserIdentity, UserQueryDto};
+use crate::payload::user_dto::{UserCreateDto, UserIdentity};
 use crate::repository::user_repository::UserRepository;
 
 #[derive(Clone)]
@@ -34,8 +34,13 @@ impl UserService {
         }
     }
 
-    pub async fn find_user(&self, data: UserQueryDto) -> Result<User, ApiError> {
-        let user = match data.identity {
+    pub async fn find_user(&self, identity: UserIdentity) -> Result<User, ApiError> {
+        let user = match identity {
+            UserIdentity::Id(id) => {
+                self.user_repo.find(id)
+                    .await
+                    .ok_or(UserError::UserNotFound)?
+            }
             UserIdentity::Username(username) => {
                 self.user_repo.find_by_username(&username)
                     .await
