@@ -20,6 +20,14 @@ pub struct Database {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct Control {
+    pub embed: bool,
+    pub client_id: String,
+    pub host: String,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Auth {
     pub secret: String,
     pub expiration: u64,
@@ -30,6 +38,7 @@ pub struct Settings {
     pub server: Server,
     pub logger: Logger,
     pub database: Database,
+    pub control: Control,
     pub auth: Auth,
 }
 

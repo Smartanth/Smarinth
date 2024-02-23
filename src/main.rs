@@ -12,7 +12,7 @@ use crate::configs::settings::Settings;
 use crate::handlers::auth_handler;
 use crate::middlewares::auth_middleware::JWTAuth;
 use crate::repository::user_repository::UserRepository;
-use crate::services::{auth_service, token_service, user_service};
+use crate::services::{auth_service, control_service, token_service, user_service};
 use crate::states::{auth_state, user_state};
 
 mod configs;
@@ -31,6 +31,13 @@ async fn main() -> io::Result<()> {
     let database = Arc::new(Database::new(&settings).await.expect("Fail to init database."));
     let hasher = Arc::new(Argon2Hash::new()) as Arc<dyn Password>;
 
+    let user_repo = Arc::new(UserRepository::new(&hasher, &database));
+
+    let auth_service = Arc::new(auth_service::AuthService::new(&hasher));
+    let control_service = Arc::new(control_service::ControlService::new(&settings).await);
+    let token_service = Arc::new(token_service::TokenService::new(&settings));
+    let user_service = Arc::new(user_service::UserService::new(&user_repo));
+
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
             let app_name = env!("CARGO_PKG_NAME").replace('-', "_");
@@ -48,12 +55,6 @@ async fn main() -> io::Result<()> {
     tracing::debug!("listening on {}", address);
 
     web::HttpServer::new(move || {
-        let user_repo = Arc::new(UserRepository::new(&hasher, &database));
-
-        let auth_service = Arc::new(auth_service::AuthService::new(&hasher));
-        let token_service = Arc::new(token_service::TokenService::new(&settings));
-        let user_service = Arc::new(user_service::UserService::new(&user_repo));
-
         let auth_state = auth_state::AuthState {
             auth_service: auth_service.clone(),
             token_service: token_service.clone(),

@@ -8,6 +8,12 @@ level = "debug"
 [database]
 url = "sqlite::memory:"
 
+[control]
+embed = true
+client_id = "client-smarinth"
+host = "127.0.0.1"
+port = 1883
+
 [auth]
-secret = "smartanth-secret"
+secret = "smarinth-secret"
 expiration = 233333
