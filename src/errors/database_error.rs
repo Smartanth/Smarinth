@@ -22,12 +22,15 @@ impl From<sqlx::Error> for DatabaseError {
     fn from(err: sqlx::Error) -> Self {
         match err {
             sqlx::Error::Database(err) => {
-                if err.code().map_or(false, |code| code == "23000" || code == "1062") {
+                if err
+                    .code()
+                    .map_or(false, |code| code == "23000" || code == "1062")
+                {
                     DatabaseError::UniqueConstraintViolation
                 } else {
                     DatabaseError::InternalDatabaseError(err.to_string())
                 }
-            },
+            }
             _ => DatabaseError::InternalDatabaseError(err.to_string()),
         }
     }

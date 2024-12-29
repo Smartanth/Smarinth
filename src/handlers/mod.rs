@@ -1,1 +1,3 @@
-pub mod auth_handler;
+mod auth_handler;
+
+pub use auth_handler::{auth, register};

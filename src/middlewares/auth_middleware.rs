@@ -3,10 +3,10 @@ use std::sync::Arc;
 use ntex::{http, Middleware, Service, ServiceCtx};
 use ntex::web::{Error, ErrorRenderer, WebRequest, WebResponse};
 
-use crate::entities::user::User;
-use crate::errors::token_error::TokenError;
-use crate::payload::user_dto::UserIdentity;
-use crate::states::auth_state::AuthState;
+use crate::entities::User;
+use crate::errors::TokenError;
+use crate::payload::UserIdentity;
+use crate::states::AuthState;
 
 pub struct JWTAuth {
     state: Arc<AuthState>,
@@ -44,13 +44,13 @@ impl<S, Err> Service<WebRequest<Err>> for JWTAuthMiddleware<S>
     type Response = WebResponse;
     type Error = Error;
 
-    ntex::forward_poll_ready!(service);
-    ntex::forward_poll_shutdown!(service);
+    ntex::forward_ready!(service);
+    ntex::forward_shutdown!(service);
 
     async fn call(
         &self,
         req: WebRequest<Err>,
-        ctx: ServiceCtx<'_, Self>
+        ctx: ServiceCtx<'_, Self>,
     ) -> Result<Self::Response, Self::Error> {
         let token = match req.headers().get(http::header::AUTHORIZATION) {
             Some(header_value) => {
@@ -73,9 +73,8 @@ impl<S, Err> Service<WebRequest<Err>> for JWTAuthMiddleware<S>
 
                 let identity = UserIdentity::Id(token_data.claims.sub.parse().unwrap());
 
-                req.extensions_mut().insert(self.state.user_service
-                    .find_user(identity)
-                    .await?);
+                req.extensions_mut()
+                    .insert(self.state.user_service.find_user(identity).await?);
 
                 let res = ctx.call(&self.service, req).await?;
 

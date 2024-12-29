@@ -1,11 +1,15 @@
-use async_trait::async_trait;
-use sqlx::{AnyPool, Error};
+mod user;
 
-use crate::configs::database::DatabaseScheme;
+pub use user::{User, UserTable};
 
-pub mod user;
+use crate::configs::DatabaseScheme;
 
-#[async_trait]
-pub trait Builder {
-    async fn build(db_scheme: &DatabaseScheme, pool: &AnyPool) -> Result<(), Error>;
+pub trait Table {
+    fn name(&self) -> &'static str;
+
+    fn create(&self, scheme: &DatabaseScheme) -> String;
+
+    fn dispose(&self) -> String;
+
+    fn dependencies(&self) -> Vec<&'static str>;
 }

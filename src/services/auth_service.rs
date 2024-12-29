@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::configs::password::Password;
-use crate::entities::user::User;
+use crate::configs::Password;
+use crate::entities::User;
 
 #[derive(Clone)]
 pub struct AuthService {

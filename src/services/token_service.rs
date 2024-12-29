@@ -1,13 +1,13 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use jsonwebtoken::{decode, DecodingKey, encode, EncodingKey, Header, TokenData, Validation};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use jsonwebtoken::errors::ErrorKind;
 
-use crate::configs::settings::Settings;
-use crate::entities::user::User;
-use crate::errors::token_error::TokenError;
-use crate::payload::token_dto::{TokenClaimsDto, TokenDto};
+use crate::configs::Settings;
+use crate::entities::User;
+use crate::errors::TokenError;
+use crate::payload::{TokenClaimsDto, TokenDto};
 
 #[derive(Clone)]
 pub struct TokenService {
@@ -23,17 +23,20 @@ impl TokenService {
         }
     }
 
-    pub fn retrieve_token_claims(&self, token: &str) -> Result<TokenData<TokenClaimsDto>, TokenError> {
+    pub fn retrieve_token_claims(
+        &self,
+        token: &str,
+    ) -> Result<TokenData<TokenClaimsDto>, TokenError> {
         match decode::<TokenClaimsDto>(
             token,
             &DecodingKey::from_secret(self.secret.as_ref()),
-            &Validation::default()
+            &Validation::default(),
         ) {
             Ok(claims) => Ok(claims),
             Err(err) => match err.kind() {
                 ErrorKind::ExpiredSignature => Err(TokenError::TokenExpired)?,
                 _ => Err(TokenError::InvalidToken(token.to_string()))?,
-            }
+            },
         }
     }
 
@@ -60,4 +63,3 @@ impl TokenService {
         Ok(TokenDto { token, iat, exp })
     }
 }
-

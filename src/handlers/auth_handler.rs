@@ -1,9 +1,9 @@
-use ntex::web::{Error, HttpResponse, post, Responder, types};
+use ntex::web::{post, types, Error, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
 
-use crate::errors::user_error::UserError;
-use crate::payload::user_dto::{UserCreateDto, UserDto, UserIdentity};
-use crate::states::{auth_state, user_state};
+use crate::errors::UserError;
+use crate::payload::{UserCreateDto, UserDto, UserIdentity};
+use crate::states::{AuthState, UserState};
 
 #[derive(Clone, Serialize, Deserialize)]
 struct LoginPayload {
@@ -15,9 +15,13 @@ struct LoginPayload {
 #[post("/login")]
 pub async fn auth(
     payload: types::Json<LoginPayload>,
-    auth_state: types::State<auth_state::AuthState>,
+    auth_state: types::State<AuthState>,
 ) -> Result<impl Responder, Error> {
-    let types::Json(LoginPayload { username, email, password }) = payload;
+    let types::Json(LoginPayload {
+        username,
+        email,
+        password,
+    }) = payload;
     let identity = match username {
         Some(username) => UserIdentity::Username(username),
         None => match email {
@@ -33,7 +37,7 @@ pub async fn auth(
             let result = auth_state.token_service.generate_token(user)?;
 
             Ok(HttpResponse::Ok().json(&result))
-        },
+        }
         false => Err(UserError::InvalidPassword)?,
     }
 }
@@ -48,10 +52,18 @@ struct RegisterPayload {
 #[post("/register")]
 pub async fn register(
     payload: types::Json<RegisterPayload>,
-    user_state: types::State<user_state::UserState>,
+    user_state: types::State<UserState>,
 ) -> Result<impl Responder, Error> {
-    let types::Json(RegisterPayload { username, email, password }) = payload;
-    let create_data = UserCreateDto { username, email, password };
+    let types::Json(RegisterPayload {
+        username,
+        email,
+        password,
+    }) = payload;
+    let create_data = UserCreateDto {
+        username,
+        email,
+        password,
+    };
 
     let user = user_state.user_service.create_user(create_data).await?;
     let result = UserDto::from(user);

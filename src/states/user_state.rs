@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::services::user_service::UserService;
+use crate::services::UserService;
 
 #[derive(Clone)]
 pub struct UserState {

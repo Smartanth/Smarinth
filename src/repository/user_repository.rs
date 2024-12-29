@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
-use crate::configs::database::{Database, DatabaseScheme};
-use crate::configs::password::Password;
-use crate::entities::user::User;
-use crate::errors::api_error::ApiError;
-use crate::errors::database_error::DatabaseError;
-use crate::errors::user_error::UserError;
-use crate::payload::user_dto::UserCreateDto;
+use crate::configs::{Database, Password};
+use crate::entities::User;
+use crate::errors::{ApiError, DatabaseError, UserError};
+use crate::payload::UserCreateDto;
 use crate::sql;
 
 #[derive(Clone)]
@@ -28,7 +25,7 @@ impl UserRepository {
 
         let query = sqlx::query_as::<_, User>(&statement).bind(email);
 
-        query.fetch_optional(self.database.get_pool()).await.unwrap_or(None)
+        query.fetch_optional(&self.database.pool).await.unwrap_or(None)
     }
 
     pub async fn find_by_username(&self, username: &str) -> Option<User> {
@@ -36,7 +33,7 @@ impl UserRepository {
 
         let query = sqlx::query_as::<_, User>(&statement).bind(username);
 
-        query.fetch_optional(self.database.get_pool()).await.unwrap_or(None)
+        query.fetch_optional(&self.database.pool).await.unwrap_or(None)
     }
 
     pub async fn find(&self, id: i32) -> Option<User> {
@@ -44,7 +41,7 @@ impl UserRepository {
 
         let query = sqlx::query_as::<_, User>(&statement).bind(id);
 
-        query.fetch_optional(self.database.get_pool()).await.unwrap_or(None)
+        query.fetch_optional(&self.database.pool).await.unwrap_or(None)
     }
 
     pub async fn add<T: Into<UserCreateDto>>(&self, data: T) -> Result<User, ApiError> {
@@ -56,9 +53,7 @@ impl UserRepository {
 
         let query = sqlx::query(&statement).bind(&username).bind(&email).bind(&user_password);
 
-        let affected = query.execute(self.database.get_pool()).await
-            .map_err(DatabaseError::from)?
-            .rows_affected();
+        let affected = query.execute(&self.database.pool).await.map_err(DatabaseError::from)?.rows_affected();
         if affected > 0 {
             self.find_by_email(&email).await.ok_or(UserError::UserNotFound.into())
         } else {
@@ -71,7 +66,7 @@ impl UserRepository {
 
         let query = sqlx::query(&statement).bind(id);
 
-        query.execute(self.database.get_pool()).await.map_err(DatabaseError::from)?;
+        query.execute(&self.database.pool).await.map_err(DatabaseError::from)?;
 
         Ok(true)
     }
@@ -81,16 +76,13 @@ impl UserRepository {
 mod user_repository_tests {
     use std::sync::Arc;
 
-    use crate::configs::database::Database;
-    use crate::configs::password::{Argon2Hash, Password};
-    use crate::configs::settings::Settings;
-
     use super::*;
+    use crate::configs::{Argon2Hash, Database, Password, SchemaManager, Settings};
 
     #[tokio::test]
     async fn test_crud_operations() {
         let settings = Arc::new(Settings::new().unwrap());
-        let database = Arc::new(Database::new(&settings).unwrap());
+        let database = Arc::new(Database::new(&settings, &SchemaManager::default()).await.unwrap());
         let password = Arc::new(Argon2Hash::new()) as Arc<dyn Password>;
         let repo = UserRepository::new(&password, &database);
 

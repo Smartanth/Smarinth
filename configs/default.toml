@@ -6,6 +6,7 @@ port = 8080
 level = "debug"
 
 [database]
+clean_start = true
 url = "sqlite::memory:"
 
 [control]

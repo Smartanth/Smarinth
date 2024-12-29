@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter};
 
 use serde::{Deserialize, Serialize};
 
-use crate::entities::user::User;
+use crate::entities::User;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum UserIdentity {

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::services::auth_service::AuthService;
-use crate::services::token_service::TokenService;
-use crate::services::user_service::UserService;
+use crate::services::AuthService;
+use crate::services::TokenService;
+use crate::services::UserService;
 
 #[derive(Clone)]
 pub struct AuthState {

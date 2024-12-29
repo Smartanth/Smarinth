@@ -1,18 +1,19 @@
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use sqlx::{AnyPool, ConnectOptions, Error, Executor};
-use sqlx::any::{AnyConnectOptions, AnyPoolOptions};
+use sqlx::any::{Any, AnyConnectOptions, AnyPoolOptions};
+use sqlx::migrate::{MigrateDatabase, Migrator};
+use sqlx::{AnyPool, ConnectOptions, Connection, Error};
 
-use crate::configs::settings::Settings;
-use crate::entities::Builder;
-use crate::entities::user::UserBuilder;
+use super::schema::SchemaManager;
+use super::settings::Settings;
 
 #[macro_export]
 macro_rules! sql {
     ($scheme:expr, $query:expr) => {{
         match $scheme {
-            DatabaseScheme::MYSQL => {
+            crate::configs::DatabaseScheme::MYSQL => {
                 let mut result = String::new();
                 let mut chars = $query.chars().peekable();
                 let mut in_single_quotes = false;
@@ -23,9 +24,9 @@ macro_rules! sql {
                             in_single_quotes = !in_single_quotes;
                             result.push(c);
                         }
-                        '$' if !in_single_quotes && chars.peek().map_or(false, |next| next.is_digit(10)) => {
+                        '$' if !in_single_quotes && chars.peek().map_or(false, |next| next.is_ascii_digit()) => {
                             // Consume the digits following the '$'
-                            while chars.peek().map_or(false, |next| next.is_digit(10)) {
+                            while chars.peek().map_or(false, |next| next.is_ascii_digit()) {
                                 chars.next();
                             }
                             result.push('?');
@@ -35,7 +36,7 @@ macro_rules! sql {
                 }
                 result
             },
-            DatabaseScheme::POSTGRES | DatabaseScheme::SQLITE => $query.to_string(),
+            _ => $query.to_string(),
         }
     }};
 }
@@ -54,7 +55,7 @@ pub struct Database {
 }
 
 impl Database {
-    pub async fn new(settings: &Arc<Settings>) -> Result<Self, Error> {
+    pub async fn new(settings: &Arc<Settings>, schema_manager: &SchemaManager) -> Result<Self, Error> {
         let db_url = &settings.database.url;
         let db_options = AnyConnectOptions::from_str(db_url)?;
         let db_scheme = match db_options.database_url.scheme() {
@@ -65,49 +66,41 @@ impl Database {
 
         sqlx::any::install_default_drivers();
 
-        let pool = match AnyPoolOptions::new().connect_with(db_options).await {
-            Ok(pool) => {
-                Self::create_tables(&db_scheme, &pool).await?;
+        match db_options.connect().await {
+            Ok(conn) => conn.close().await?,
+            Err(_) => Any::create_database(db_url).await?,
+        }
 
-                pool
-            },
-            Err(Error::Database(_)) => {
-                let pool = Self::create_database(db_url).await?;
-                Self::create_tables(&db_scheme, &pool).await?;
+        let pool = AnyPoolOptions::new().connect_with(db_options).await?;
 
-                pool
-            }
-            Err(err) => Err(err)?,
-        };
+        if settings.database.clean_start {
+            let dispose_statements = schema_manager.dispose_schema();
+            let create_statements = schema_manager.create_schema(&db_scheme);
+            let statements = [&dispose_statements[..], &create_statements[..]].concat();
+
+            sqlx::query("DROP TABLE IF EXISTS _sqlx_migrations")
+                .execute(&pool)
+                .await?;
+
+            sqlx::query(&statements.join("\n"))
+                .execute(&pool)
+                .await?;
+
+            tracing::warn!("perform a clean boot: clean and recreate schema");
+        }
+
+        if let Some(migration_path) = settings.database.migration_path.clone() {
+            let mut pool_connection = pool.acquire().await?;
+            let migrator = Migrator::new(Path::new(&migration_path)).await?;
+            migrator.run(&mut pool_connection).await?;
+
+            tracing::info!("database migration success");
+        }
 
         Ok(Self {
             scheme: db_scheme,
             pool,
         })
-    }
-
-    pub fn get_pool(&self) -> &AnyPool {
-        &self.pool
-    }
-
-    async fn create_database(url: &str) -> Result<AnyPool, Error> {
-        let (base_url, path) = url.split_at(url.rfind('/').unwrap());
-
-        let mut db_conn = AnyConnectOptions::from_str(base_url)?.connect().await?;
-
-        let statement = format!("CREATE DATABASE {}", &path[1..]);
-
-        db_conn.execute(&statement[..]).await?;
-
-        let db_options = AnyConnectOptions::from_str(url)?;
-
-        AnyPoolOptions::new().connect_with(db_options).await
-    }
-
-    async fn create_tables(scheme: &DatabaseScheme, pool: &AnyPool) -> Result<(), Error> {
-        UserBuilder::build(&scheme, pool).await?;
-
-        Ok(())
     }
 }
 
@@ -120,6 +113,7 @@ mod database_tests {
         let query = "SELECT * FROM users WHERE id = $1";
         let expected = "SELECT * FROM users WHERE id = ?";
         let actual = sql!(DatabaseScheme::MYSQL, query);
+
         assert_eq!(actual, expected);
     }
 
@@ -128,6 +122,7 @@ mod database_tests {
         let query = "SELECT * FROM users WHERE id = $1";
         let expected = "SELECT * FROM users WHERE id = $1";
         let actual = sql!(DatabaseScheme::POSTGRES, query);
+
         assert_eq!(actual, expected);
     }
 
@@ -136,6 +131,7 @@ mod database_tests {
         let query = "INSERT INTO users (name, age, salary) VALUES ($1, $2, $3)";
         let expected = "INSERT INTO users (name, age, salary) VALUES (?, ?, ?)";
         let actual = sql!(DatabaseScheme::MYSQL, query);
+
         assert_eq!(actual, expected);
     }
 
@@ -144,6 +140,7 @@ mod database_tests {
         let query = "SELECT * FROM users WHERE name = '$1' AND email = 'email$2@example.com'";
         let expected = "SELECT * FROM users WHERE name = '$1' AND email = 'email$2@example.com'";
         let actual = sql!(DatabaseScheme::MYSQL, query);
+
         assert_eq!(actual, expected);
     }
 }
