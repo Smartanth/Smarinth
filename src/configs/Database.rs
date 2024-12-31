@@ -56,8 +56,8 @@ pub struct Database {
 
 impl Database {
     pub async fn new(settings: &Arc<Settings>, schema_manager: &SchemaManager) -> Result<Self, Error> {
-        let db_url = &settings.database.url;
-        let db_options = AnyConnectOptions::from_str(db_url)?;
+        let db_url = settings.database.url.clone();
+        let db_options = AnyConnectOptions::from_str(&db_url)?;
         let db_scheme = match db_options.database_url.scheme() {
             "postgres" => DatabaseScheme::POSTGRES,
             "mysql" => DatabaseScheme::MYSQL,
@@ -67,8 +67,8 @@ impl Database {
         sqlx::any::install_default_drivers();
 
         match db_options.connect().await {
-            Ok(conn) => conn.close().await?,
-            Err(_) => Any::create_database(db_url).await?,
+            Ok(try_conn) => try_conn.close().await?,
+            Err(_) => Any::create_database(&db_url).await?,
         }
 
         let pool = AnyPoolOptions::new().connect_with(db_options).await?;
@@ -82,9 +82,11 @@ impl Database {
                 .execute(&pool)
                 .await?;
 
-            sqlx::query(&statements.join("\n"))
-                .execute(&pool)
-                .await?;
+            for statement in statements.iter() {
+                sqlx::query(&statement)
+                    .execute(&pool)
+                    .await?;
+            }
 
             tracing::warn!("perform a clean boot: clean and recreate schema");
         }

@@ -29,14 +29,11 @@ impl Table for UserTable {
         let text_type = "VARCHAR(255)";
 
         format!(
-            r#"
-            CREATE TABLE IF NOT EXISTS {} (
-                id {id_type},
-                username {text_type} NOT NULL,
-                email {text_type} NOT NULL UNIQUE,
-                password {text_type} NOT NULL
-            );
-            "#,
+            "CREATE TABLE IF NOT EXISTS {} (\
+                id {id_type}, \
+                username {text_type} NOT NULL, \
+                email {text_type} NOT NULL UNIQUE, \
+                password {text_type} NOT NULL);",
             self.name()
         )
     }

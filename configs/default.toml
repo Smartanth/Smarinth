@@ -7,7 +7,7 @@ level = "debug"
 
 [database]
 clean_start = true
-url = "sqlite::memory:"
+url = "sqlite:file:smarinth?mode=memory&cache=shared"
 
 [control]
 embed = true

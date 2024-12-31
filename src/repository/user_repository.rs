@@ -97,6 +97,6 @@ mod user_repository_tests {
 
         let result = repo.remove(user.unwrap().id).await.unwrap();
 
-        assert!(result, "Record should be remove.")
+        assert!(result, "Record should be remove.");
     }
 }
