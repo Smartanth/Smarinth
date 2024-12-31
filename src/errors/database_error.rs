@@ -3,13 +3,16 @@ use ntex::web::WebResponseError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum DatabaseError {
-    #[error("Internal database error: {0}")]
-    InternalDatabaseError(String),
+    #[error("Database Migration Error: Failed to migrate the database. Details: {0}.")]
+    DatabaseMigrateError(#[from] sqlx::migrate::MigrateError),
 
-    #[error("Internal sqlx layer error {0}")]
-    InternalSqlxError(String),
+    #[error("Database Access Error: Unable to access the database. Details: {0}.")]
+    DatabaseAccessError(String),
 
-    #[error("Unique constraint violation")]
+    #[error("Database SQL Execution Error: Failed to execute the SQL statement. Returned: {0}.")]
+    DatabaseExecuteError(String),
+
+    #[error("Database Constraint Violation: A unique constraint violation has been detected.")]
     UniqueConstraintViolation,
 }
 
@@ -31,13 +34,13 @@ impl From<sqlx::Error> for DatabaseError {
                         "23505" => DatabaseError::UniqueConstraintViolation, // Postgres
                         "1062" => DatabaseError::UniqueConstraintViolation, // Mysql
                         "2067" => DatabaseError::UniqueConstraintViolation, // Sqlite
-                        _ => DatabaseError::InternalDatabaseError(db_err.message().to_string()),
+                        _ => DatabaseError::DatabaseExecuteError(db_err.message().to_string()),
                     }
                 } else {
-                    DatabaseError::InternalDatabaseError(db_err.to_string())
+                    DatabaseError::DatabaseExecuteError(db_err.to_string())
                 }
             }
-            _ => DatabaseError::InternalSqlxError(err.to_string()),
+            _ => DatabaseError::DatabaseAccessError(err.to_string()),
         }
     }
 }

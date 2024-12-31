@@ -3,16 +3,20 @@ use ntex::web::WebResponseError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum UserError {
-    #[error("Missing user name or email")]
+    #[error("User Identity Error: Missing required user identity information. Either name or email must be provided.")]
     MissingIdentity,
-    #[error("User account not found")]
+
+    #[error("User Retrieval Error: The specified user account could not be found.")]
     UserNotFound,
-    #[error("User account already exists")]
+
+    #[error("User Creation Error: A user account with the provided details already exists.")]
     UserAlreadyExists,
-    #[error("Fail to create user account")]
+
+    #[error("User Creation Failure: Unable to create the user account. Please verify the provided information and try again.")]
     UserCreateFail,
-    #[error("Invalid password")]
-    InvalidPassword,
+
+    #[error("User Update Failure: Unable to update the user account. Please verify the details and attempt the operation again.")]
+    UserUpdateFail,
 }
 
 impl WebResponseError for UserError {
@@ -22,7 +26,7 @@ impl WebResponseError for UserError {
             UserError::UserNotFound => StatusCode::NOT_FOUND,
             UserError::UserAlreadyExists => StatusCode::BAD_REQUEST,
             UserError::UserCreateFail => StatusCode::INTERNAL_SERVER_ERROR,
-            UserError::InvalidPassword => StatusCode::BAD_REQUEST,
+            UserError::UserUpdateFail => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

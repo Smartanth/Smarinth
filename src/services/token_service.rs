@@ -5,9 +5,8 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, 
 use jsonwebtoken::errors::ErrorKind;
 
 use crate::configs::Settings;
-use crate::entities::User;
-use crate::errors::TokenError;
-use crate::payload::{TokenClaimsDto, TokenDto};
+use crate::errors::AuthError;
+use crate::payload::{TokenClaimsDto, TokenDto, UserDto};
 
 #[derive(Clone)]
 pub struct TokenService {
@@ -26,7 +25,7 @@ impl TokenService {
     pub fn retrieve_token_claims(
         &self,
         token: &str,
-    ) -> Result<TokenData<TokenClaimsDto>, TokenError> {
+    ) -> Result<TokenData<TokenClaimsDto>, AuthError> {
         match decode::<TokenClaimsDto>(
             token,
             &DecodingKey::from_secret(self.secret.as_ref()),
@@ -34,13 +33,13 @@ impl TokenService {
         ) {
             Ok(claims) => Ok(claims),
             Err(err) => match err.kind() {
-                ErrorKind::ExpiredSignature => Err(TokenError::TokenExpired)?,
-                _ => Err(TokenError::InvalidToken(token.to_string()))?,
+                ErrorKind::ExpiredSignature => Err(AuthError::TokenExpired)?,
+                _ => Err(AuthError::InvalidToken(token.to_string()))?,
             },
         }
     }
 
-    pub fn generate_token(&self, user: User) -> Result<TokenDto, TokenError> {
+    pub fn generate_token(&self, user: UserDto) -> Result<TokenDto, AuthError> {
         let iat = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
@@ -58,7 +57,7 @@ impl TokenService {
         let encoding_key = EncodingKey::from_secret(self.secret.as_ref());
 
         let token = encode(&Header::default(), &claims, &encoding_key)
-            .map_err(|e| TokenError::TokenCreationError(e.to_string()))?;
+            .map_err(|e| AuthError::TokenCreationError(e.to_string()))?;
 
         Ok(TokenDto { token, iat, exp })
     }

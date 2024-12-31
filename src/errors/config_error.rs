@@ -7,19 +7,19 @@ use toml::{de, ser};
 
 #[derive(thiserror::Error, Debug)]
 pub enum ConfigError {
-    #[error("Incompatible types at path {path:?}, expected {expected_type:?} received {actual_type:?}.")]
+    #[error("Configuration Error: Type mismatch detected at path '{path}'. Expected type '{expected_type}', but received type '{actual_type}'.")]
     IncompatibleTypeError { path: String, expected_type: String, actual_type: String },
 
-    #[error("Failed to load the configuration file as UTF-8.")]
+    #[error("Configuration Loading Error: Failed to load the configuration file. Please ensure the file is encoded in valid UTF-8 format.")]
     Utf8LoadError(#[from] FromUtf8Error),
 
-    #[error("Failed to serialize the configuration file.")]
+    #[error("Configuration Serialization Error: Unable to serialize the configuration data.")]
     SerializeError(#[from] ser::Error),
 
-    #[error("Failed to deserialize the configuration file.")]
+    #[error("Configuration Deserialization Error: Unable to deserialize the configuration data.")]
     DeserializeError(#[from] de::Error),
 
-    #[error("File path operation failed.")]
+    #[error("File Path Error: Operation on the file path failed with error: {0}.")]
     PathError(#[from] io::Error),
 }
 

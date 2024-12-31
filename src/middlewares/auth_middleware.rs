@@ -4,8 +4,7 @@ use ntex::{http, Middleware, Service, ServiceCtx};
 use ntex::web::{Error, ErrorRenderer, WebRequest, WebResponse};
 
 use crate::entities::User;
-use crate::errors::TokenError;
-use crate::payload::UserIdentity;
+use crate::errors::AuthError;
 use crate::states::AuthState;
 
 pub struct JWTAuth {
@@ -70,11 +69,9 @@ impl<S, Err> Service<WebRequest<Err>> for JWTAuthMiddleware<S>
         match token {
             Some(token) => {
                 let token_data = self.state.token_service.retrieve_token_claims(token)?;
+                let user_data = self.state.auth_service.authentication_user(token_data.claims).await?;
 
-                let identity = UserIdentity::Id(token_data.claims.sub.parse().unwrap());
-
-                req.extensions_mut()
-                    .insert(self.state.user_service.find_user(identity).await?);
+                req.extensions_mut().insert(user_data);
 
                 let res = ctx.call(&self.service, req).await?;
 
@@ -82,7 +79,7 @@ impl<S, Err> Service<WebRequest<Err>> for JWTAuthMiddleware<S>
 
                 Ok(res)
             }
-            _ => Err(TokenError::MissingToken)?,
+            _ => Err(AuthError::MissingToken)?,
         }
     }
 }

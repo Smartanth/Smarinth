@@ -127,3 +127,33 @@ impl Settings {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_nested_tables() {
+        let table1: Value = toml::from_str(
+            r#"
+[server]
+host = "127.0.0.1"
+port = 8080
+"#
+        )
+            .unwrap();
+
+        let table2: Value = toml::from_str(
+            r#"
+[server]
+port = 9090
+"#,
+        )
+            .unwrap();
+
+        let merged = Settings::merge(table1, table2, "$").unwrap();
+        let merged_table = merged.as_table().unwrap();
+        assert_eq!(merged_table["server"]["host"], "127.0.0.1".into());
+        assert_eq!(merged_table["server"]["port"], 9090.into());
+    }
+}

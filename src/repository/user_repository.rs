@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::configs::{Database, Password};
 use crate::entities::User;
 use crate::errors::{ApiError, DatabaseError, UserError};
-use crate::payload::UserCreateDto;
+use crate::payload::{UserCreateDao, UserUpdateDao};
 use crate::sql;
 
 #[derive(Clone)]
@@ -44,20 +44,59 @@ impl UserRepository {
         query.fetch_optional(&self.database.pool).await.unwrap_or(None)
     }
 
-    pub async fn add<T: Into<UserCreateDto>>(&self, data: T) -> Result<User, ApiError> {
-        let UserCreateDto { username, email, password } = data.into();
+    pub async fn add<T: Into<UserCreateDao>>(&self, data: T) -> Result<User, ApiError> {
+        let UserCreateDao { username, email, password } = data.into();
 
-        let user_password = self.password.hash(&password).map_err(|_| UserError::InvalidPassword)?;
+        let user_password = self.password.hash(&password)?;
 
         let statement = sql!(self.database.scheme, "INSERT INTO users (username, email, password) VALUES ($1, $2, $3)");
 
         let query = sqlx::query(&statement).bind(&username).bind(&email).bind(&user_password);
 
-        let affected = query.execute(&self.database.pool).await.map_err(DatabaseError::from)?.rows_affected();
-        if affected > 0 {
+        if query.execute(&self.database.pool).await.map_err(DatabaseError::from)?.rows_affected() > 0 {
             self.find_by_email(&email).await.ok_or(UserError::UserNotFound.into())
         } else {
             Err(UserError::UserCreateFail.into())
+        }
+    }
+
+    pub async fn update<T: Into<UserUpdateDao>>(&self, data: T) -> Result<User, ApiError> {
+        let UserUpdateDao { id, username, email, password } = data.into();
+
+        let mut updates = Vec::new();
+        let mut bindings = Vec::new();
+
+        if let Some(username_value) = username {
+            updates.push("username = $".to_owned() + &(bindings.len() + 1).to_string());
+            bindings.push(username_value);
+        }
+
+        if let Some(email_value) = email {
+            updates.push("email = $".to_owned() + &(bindings.len() + 1).to_string());
+            bindings.push(email_value);
+        }
+
+        if let Some(password_value) = password {
+            let hashed_password = self.password.hash(&password_value)?;
+            updates.push("password = $".to_owned() + &(bindings.len() + 1).to_string());
+            bindings.push(hashed_password);
+        }
+
+        if updates.len() > 0 {
+            bindings.push(id.to_string());
+
+            let statement = format!("UPDATE users SET {} WHERE id = ${}", updates.join(", "), bindings.len() + 1);
+
+            let mut query = sqlx::query(&statement);
+            for value in bindings {
+                query = query.bind(value);
+            }
+
+            query.execute(&self.database.pool).await.map_err(DatabaseError::from)?;
+
+            self.find(id).await.ok_or(ApiError::from(UserError::UserNotFound))
+        } else {
+            Err(UserError::UserUpdateFail)?
         }
     }
 
@@ -86,12 +125,12 @@ mod user_repository_tests {
         let password = Arc::new(Argon2Hash::new()) as Arc<dyn Password>;
         let repo = UserRepository::new(&password, &database);
 
-        let mock_dto = UserCreateDto {
+        let mock_dao = UserCreateDao {
             username: "test_user".to_string(),
             email: "test_user@test_email.com".to_string(),
             password: "test_password".to_string(),
         };
-        let user = repo.add(mock_dto).await;
+        let user = repo.add(mock_dao).await;
 
         assert!(user.is_ok(), "Should create and find registered user.");
 

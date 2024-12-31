@@ -31,7 +31,7 @@ impl Table for UserTable {
         format!(
             "CREATE TABLE IF NOT EXISTS {} (\
                 id {id_type}, \
-                username {text_type} NOT NULL, \
+                username {text_type} NOT NULL UNIQUE, \
                 email {text_type} NOT NULL UNIQUE, \
                 password {text_type} NOT NULL);",
             self.name()

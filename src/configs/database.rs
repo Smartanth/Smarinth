@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use sqlx::any::{Any, AnyConnectOptions, AnyPoolOptions};
 use sqlx::migrate::{MigrateDatabase, Migrator};
-use sqlx::{AnyPool, ConnectOptions, Connection, Error};
+use sqlx::{AnyPool, ConnectOptions, Connection};
 
+use crate::errors::DatabaseError;
 use super::schema::SchemaManager;
 use super::settings::Settings;
 
@@ -55,7 +56,7 @@ pub struct Database {
 }
 
 impl Database {
-    pub async fn new(settings: &Arc<Settings>, schema_manager: &SchemaManager) -> Result<Self, Error> {
+    pub async fn new(settings: &Arc<Settings>, schema_manager: &SchemaManager) -> Result<Self, DatabaseError> {
         let db_url = settings.database.url.clone();
         let db_options = AnyConnectOptions::from_str(&db_url)?;
         let db_scheme = match db_options.database_url.scheme() {

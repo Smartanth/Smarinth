@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use crate::entities::User;
 use crate::errors::{ApiError, UserError};
-use crate::payload::{UserCreateDto, UserIdentity};
+use crate::payload::{UserDto, UserIdentity, UserUpdateDao, UserUpdateDto};
 use crate::repository::user_repository::UserRepository;
 
 #[derive(Clone)]
@@ -17,23 +16,7 @@ impl UserService {
         }
     }
 
-    pub async fn create_user(&self, data: UserCreateDto) -> Result<User, ApiError> {
-        let UserCreateDto { username, email, password } = data.into();
-
-        let user_exist = self.user_repo.find_by_email(&email).await.is_some();
-        let email_exist = self.user_repo.find_by_username(&username).await.is_some();
-
-        if !user_exist && !email_exist {
-            let user_data = UserCreateDto { username, email, password };
-            let user = self.user_repo.add(user_data).await?;
-
-            Ok(user)
-        } else {
-            Err(UserError::UserAlreadyExists)?
-        }
-    }
-
-    pub async fn find_user(&self, identity: UserIdentity) -> Result<User, ApiError> {
+    pub async fn find_user(&self, identity: UserIdentity) -> Result<UserDto, ApiError> {
         let user = match identity {
             UserIdentity::Id(id) => self
                 .user_repo
@@ -52,6 +35,18 @@ impl UserService {
                 .ok_or(UserError::UserNotFound)?,
         };
 
-        Ok(user)
+        Ok(user.into())
+    }
+
+    pub async fn update_user(&self, identity: UserIdentity, data: UserUpdateDto) -> Result<UserDto, ApiError> {
+        let UserUpdateDto { username, email, password } = data.into();
+
+        let id = self.find_user(identity).await?.id;
+
+        let user_data = UserUpdateDao { id, username, email, password };
+
+        let user = self.user_repo.update(user_data).await?;
+
+        Ok(user.into())
     }
 }

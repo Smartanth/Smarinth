@@ -3,17 +3,20 @@ use ntex::web::WebResponseError;
 
 use super::config_error::ConfigError;
 use super::database_error::DatabaseError;
-use super::token_error::TokenError;
+use super::auth_error::AuthError;
 use super::user_error::UserError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ApiError {
     #[error(transparent)]
     ConfigError(#[from] ConfigError),
+
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
+
     #[error(transparent)]
-    TokenError(#[from] TokenError),
+    TokenError(#[from] AuthError),
+
     #[error(transparent)]
     UserError(#[from] UserError),
 }

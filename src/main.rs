@@ -2,8 +2,9 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::{env, io};
 
-use ntex::web;
+use ntex::{http, web};
 use ntex::web::{scope, App};
+use ntex_cors::Cors;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::configs::{Argon2Hash, Database, Password, SchemaManager, Settings};
@@ -26,12 +27,12 @@ mod states;
 #[ntex::main]
 async fn main() -> io::Result<()> {
     let settings = Arc::new(Settings::new().expect("Failed to load settings."));
-    let database = Arc::new(Database::new(&settings, &SchemaManager::default()).await.expect("Fail to init database."), );
+    let database = Arc::new(Database::new(&settings, &SchemaManager::default()).await.expect("Fail to init database."));
     let hasher = Arc::new(Argon2Hash::new()) as Arc<dyn Password>;
 
     let user_repo = Arc::new(UserRepository::new(&hasher, &database));
 
-    let auth_service = Arc::new(AuthService::new(&hasher));
+    let auth_service = Arc::new(AuthService::new(&user_repo, &hasher));
     let token_service = Arc::new(TokenService::new(&settings));
     let user_service = Arc::new(UserService::new(&user_repo));
 
@@ -57,7 +58,6 @@ async fn main() -> io::Result<()> {
         let auth_state = AuthState {
             auth_service: auth_service.clone(),
             token_service: token_service.clone(),
-            user_service: user_service.clone(),
         };
         let user_state = UserState {
             user_service: user_service.clone(),
@@ -66,13 +66,22 @@ async fn main() -> io::Result<()> {
         App::new()
             .state(auth_state.clone())
             .state(user_state.clone())
+            .wrap(
+                Cors::new()
+                    .allowed_origin("*")
+                    .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+                    .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
+                    .allowed_header(http::header::CONTENT_TYPE)
+                    .max_age(3600)
+                    .finish()
+            )
             .service(
                 scope("/auth")
                     .service(auth)
                     .service(register),
             )
             .service(
-                scope("api")
+                scope("/api")
                     .wrap(JWTAuth::new(&Arc::new(auth_state)))
             )
     })
