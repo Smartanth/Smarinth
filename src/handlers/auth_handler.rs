@@ -38,32 +38,86 @@ mod tests {
     use serde_json::{from_slice, json, Value};
 
     use crate::configs::{Argon2Hash, Database, Password, SchemaManager, Settings};
+    use crate::errors::{ApiError, DatabaseError};
     use crate::repository::UserRepository;
     use crate::services::{AuthService, TokenService};
+    use crate::sql;
     use super::*;
+
+    struct AuthEnvironment {
+        user_repo: Arc<UserRepository>,
+        auth_state: AuthState,
+    }
+
+    impl AuthEnvironment {
+        async fn new() -> Result<Self, ApiError> {
+            let settings = Arc::new(Settings::new()?);
+            let database = Arc::new(Database::new(&settings, &SchemaManager::default()).await?);
+            let hasher = Arc::new(Argon2Hash::new()) as Arc<dyn Password>;
+
+            let user_repo = Arc::new(UserRepository::new(&hasher, &database));
+
+            let auth_state = AuthState {
+                auth_service: Arc::new(AuthService::new(&user_repo, &hasher)),
+                token_service: Arc::new(TokenService::new(&settings)),
+            };
+
+            Ok(Self { user_repo, auth_state })
+        }
+    }
 
     #[ntex::test]
     async fn test_auth() -> Result<(), Error> {
-        let settings = Arc::new(Settings::new()?);
-        let database = Arc::new(Database::new(&settings, &SchemaManager::default()).await?);
-        let hasher = Arc::new(Argon2Hash::new()) as Arc<dyn Password>;
+        let AuthEnvironment { user_repo, auth_state } = AuthEnvironment::new().await?;
+    
+        let app = App::new().state(auth_state).service(auth);
+        let container = test::init_service(app).await;
+    
+        let username = "test_auth_user";
+        let email = "test_auth_user@sieluna.com";
+        let password = "test_auth_password";
+    
+        let statement = sql!(
+            user_repo.database.scheme,
+            "INSERT INTO users (username, email, password) VALUES ($1, $2, $3)"
+        );
+        sqlx::query(&statement)
+            .bind(&username)
+            .bind(&email)
+            .bind(&user_repo.password.hash(&password)?)
+            .execute(&user_repo.database.pool)
+            .await
+            .map_err(DatabaseError::from)?;
+    
+        let payload = json!({
+            "identity": { "email": email },
+            "password": password
+        });
+    
+        let req = test::TestRequest::post().uri("/login").set_json(&payload).to_request();
+        let resp = container.call(req).await?;
+    
+        assert_eq!(resp.status(), StatusCode::OK);
+    
+        let body: Value = from_slice(test::read_body(resp).await.as_ref())?;
+    
+        assert!(body["token"].is_string());
+        assert!(body["iat"].is_number());
+        assert!(body["exp"].is_number());
+        Ok(())
+    }
 
-        let user_repo = Arc::new(UserRepository::new(&hasher, &database));
+    #[ntex::test]
+    async fn test_register() -> Result<(), Error> {
+        let AuthEnvironment { auth_state, .. } = AuthEnvironment::new().await?;
 
-        let auth_service = Arc::new(AuthService::new(&user_repo, &hasher));
-        let token_service = Arc::new(TokenService::new(&settings));
-
-        let auth_state = AuthState {
-            auth_service: auth_service.clone(),
-            token_service: token_service.clone(),
-        };
-        let app = App::new().state(auth_state.clone()).service(auth);
+        let app = App::new().state(auth_state).service(register);
         let container = test::init_service(app).await;
 
         let payload = json!({
-            "username": "new_user",
-            "email": "new_user@sieluna.com",
-            "password": "new_password"
+            "username": "test_register_user",
+            "email": "test_register_user@sieluna.com",
+            "password": "test_register_password"
         });
 
         let req = test::TestRequest::post().uri("/register").set_json(&payload).to_request();
@@ -73,8 +127,8 @@ mod tests {
 
         let body: Value = from_slice(test::read_body(resp).await.as_ref())?;
 
-        assert_eq!(body["username"], "new_user");
-        assert_eq!(body["email"], "new_user@sieluna.com");
+        assert_eq!(body["username"], "test_register_user");
+        assert_eq!(body["email"], "test_register_user@sieluna.com");
         Ok(())
     }
 }

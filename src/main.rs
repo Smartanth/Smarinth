@@ -26,8 +26,8 @@ mod states;
 
 #[ntex::main]
 async fn main() -> io::Result<()> {
-    let settings = Arc::new(Settings::new().expect("Failed to load settings."));
-    let database = Arc::new(Database::new(&settings, &SchemaManager::default()).await.expect("Fail to init database."));
+    let settings = Arc::new(Settings::new().unwrap());
+    let database = Arc::new(Database::new(&settings, &Default::default()).await.unwrap());
     let hasher = Arc::new(Argon2Hash::new()) as Arc<dyn Password>;
 
     let user_repo = Arc::new(UserRepository::new(&hasher, &database));

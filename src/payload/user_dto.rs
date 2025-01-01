@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::entities::User;
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum UserIdentity {
     Id(i32),
     Username(String),
